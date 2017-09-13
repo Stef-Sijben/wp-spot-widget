@@ -14,17 +14,28 @@ class wp_spot_widget extends WP_Widget {
 	// constructor
 	function wp_spot_widget() {
 		parent::WP_Widget(false, $name = __('Spot GPS locations', 'wp_spot_widget') );
+		
+		add_action('wp_enqueue_scripts', array($this, 'scripts'));
+	}
+
+	function scripts() {
+		if (is_active_widget(false, false, $this->id_base, true)) {
+			// TODO: load scripts here
+			// TODO: first make GMaps API key a plugin setting
+		}
 	}
 
 	// widget form creation
 	function form($instance) {
 		// Check values
 		if( $instance) {
-			$title = esc_attr($instance['title']);
-			$feedId = esc_attr($instance['feedId']);
+			$title    = esc_attr($instance['title']);
+			$feedId   = esc_attr($instance['feedId']);
+			$gMapsKey = esc_attr($instance['gMapsKey']);
 		} else {
-			$title = 'My latest locations';
-			$feedId = '';
+			$title    = 'My latest locations';
+			$feedId   = '';
+			$gMapsKey = '';
 		}
 ?>
 
@@ -38,6 +49,10 @@ class wp_spot_widget extends WP_Widget {
 		<input class="widefat" id="<?php echo $this->get_field_id('feedId'); ?>" name="<?php echo $this->get_field_name('feedId'); ?>" type="text" value="<?php echo $feedId; ?>" />
 		</p>
 
+		<p>
+		<label for="<?php echo $this->get_field_id('gMapsKey'); ?>"><?php _e('Google maps API v3 key:', 'wp_spot_widget'); ?></label>
+		<input class="widefat" id="<?php echo $this->get_field_id('gMapsKey'); ?>" name="<?php echo $this->get_field_name('gMapsKey'); ?>" type="text" value="<?php echo $gMapsKey; ?>" />
+		</p>
 <?php /*		<p>
 		<label for="<?php echo $this->get_field_id('textarea'); ?>"><?php _e('Textarea:', 'wp_spot_widget'); ?></label>
 		<textarea class="widefat" id="<?php echo $this->get_field_id('textarea'); ?>" name="<?php echo $this->get_field_name('textarea'); ?>"><?php echo $textarea; ?></textarea>
@@ -53,34 +68,55 @@ class wp_spot_widget extends WP_Widget {
 		
 		// TODO: Validate findmyspot feed ID
 		$instance['feedId'] = strip_tags($new_instance['feedId']);
+		
+		// TODO: Validate findmyspot feed ID
+		$instance['gMapsKey'] = strip_tags($new_instance['gMapsKey']);
 		return $instance;
 	}
 
 	// widget display
 	function widget($args, $instance) {
-		extract( $args );
 		// these are the widget options
 		$title = apply_filters('widget_title', $instance['title']);
-		$text = "foo";
-		$textarea = $instance['textarea'];
-		echo $before_widget;
-		// Display the widget
-		echo '<div class="widget-text wp_spot_widget_box">';
+		$feedId = $instance['feedId'];
+		$gMapsKey = $instance['gMapsKey'];
 
+		// Don't display a widget with no feed ID set
+		if (!($feedId && $gMapsKey)) {
+			return;
+		}
+
+		// Load external JS dependencies
+		wp_enqueue_script("wp_spot_widget_gmaps", "https://maps.googleapis.com/maps/api/js?key=" . $gMapsKey,
+				array(), null);
+		wp_enqueue_script("spot-live-widget", "//d3ra5e5xmvzawh.cloudfront.net/live-widget/2.0/spot-main-min.js",
+				array("jquery"), null);
+
+
+		extract( $args );
+		echo $before_widget;
+		
+		// Display the widget
 		// Check if title is set
 		if ( $title ) {
 		  echo $before_title . $title . $after_title;
 		}
+?>
 
-		// Check if text is set
-		if( $text ) {
-		  echo '<p class="wp_spot_widget_text">'.$text.'</p>';
-		}
-		// Check if textarea is set
-		if( $textarea ) {
-		 echo '<p class="wp_spot_widget_textarea">'.$textarea.'</p>';
-		}
-		echo '</div>';
+		<div id="<?php echo $widget_id; ?>_map"></div>
+		<script type="text/javascript">
+			jQuery(function() {
+				jQuery('#<?php echo $widget_id; ?>_map').spotLiveWidget({ 
+					feedId: '<?php echo $feedId; ?>',
+					mapType: 'HYBRID',
+					width: jQuery('#<?php echo $widget_id; ?>_map').width(),
+					height: 300,
+					showLegend: false
+				});
+			});
+		</script>
+
+<?php
 		echo $after_widget;
 	}
 }
